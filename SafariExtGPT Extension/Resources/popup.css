@@ -13,3 +13,37 @@ body {
 @media (prefers-color-scheme: dark) {
     /* Dark Mode styles go here. */
 }
+
+:root {
+    color-scheme: light dark;
+}
+
+body {
+    width: 420px;
+    max-width: 420px;
+    padding: 14px;
+
+    font-family: system-ui;
+    text-align: left;
+}
+
+button {
+    margin-bottom: 10px;
+}
+
+pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    max-height: 420px;
+    overflow: auto;
+    text-align: left;
+}
+
+#auth-status {
+    font-weight: 600;
+}
+
+@media (prefers-color-scheme: dark) {
+    /* Dark Mode styles go here. */
+}

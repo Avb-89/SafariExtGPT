@@ -49,6 +49,11 @@ class ViewController: NSViewController, WKNavigationDelegate, WKScriptMessageHan
 
         SFSafariApplication.showPreferencesForExtension(withIdentifier: extensionBundleIdentifier) { error in
             DispatchQueue.main.async {
+                if let error {
+                    NSLog("Could not open Safari extension preferences: %@", String(describing: error))
+                    return
+                }
+
                 NSApplication.shared.terminate(nil)
             }
         }

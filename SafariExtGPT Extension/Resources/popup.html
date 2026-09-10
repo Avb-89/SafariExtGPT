@@ -6,6 +6,18 @@
     <script type="module" src="popup.js"></script>
 </head>
 <body>
-    <strong>Hello World!</strong>
+    <main>
+        <h1>SafariExtGPT</h1>
+
+        <section id="auth-section">
+            <button id="sign-in-button" type="button">Sign in with ChatGPT</button>
+            <p id="auth-status">Not connected</p>
+            <pre id="auth-error" hidden></pre>
+        </section>
+
+        <hr>
+
+        <pre id="page-context">Reading current page…</pre>
+    </main>
 </body>
 </html>
