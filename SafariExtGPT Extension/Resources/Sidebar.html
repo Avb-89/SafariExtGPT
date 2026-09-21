@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SafariExtGPT Sidebar</title>
+    <style>
+        :root {
+            color-scheme: dark;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            background: #2b2b2b;
+            color: #f3f3f3;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            padding: 16px 18px 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .subtitle {
+            margin-top: 4px;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.58);
+        }
+
+        main {
+            flex: 1;
+            min-height: 0;
+            padding: 16px 18px;
+            overflow: auto;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.10);
+            border-radius: 12px;
+            padding: 14px;
+        }
+
+        .label {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.52);
+        }
+
+        pre {
+            margin: 10px 0 0;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+            color: #ffffff;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>SafariExtGPT</h1>
+        <div class="subtitle">Sidebar</div>
+    </header>
+
+    <main>
+        <section class="card">
+            <div class="label">Diagnostics</div>
+            <pre id="diagnostics">Loading…</pre>
+        </section>
+    </main>
+
+    <script>
+        const diagnostics = document.getElementById("diagnostics");
+
+        diagnostics.textContent = JSON.stringify({
+            location: window.location.href,
+            innerWidth: window.innerWidth,
+            innerHeight: window.innerHeight,
+            devicePixelRatio: window.devicePixelRatio,
+            screen: {
+                width: window.screen.width,
+                height: window.screen.height,
+                availWidth: window.screen.availWidth,
+                availHeight: window.screen.availHeight
+            },
+            timestamp: new Date().toISOString()
+        }, null, 2);
+    </script>
+</body>
+</html>
