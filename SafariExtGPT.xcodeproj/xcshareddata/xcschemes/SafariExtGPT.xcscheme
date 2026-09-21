@@ -58,7 +58,11 @@
          </CommandLineArgument>
          <CommandLineArgument
             argument = "--codex-smoke-test"
-            isEnabled = "YES">
+            isEnabled = "NO">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "--chatgpt-history-test"
+            isEnabled = "NO">
          </CommandLineArgument>
       </CommandLineArguments>
    </LaunchAction>

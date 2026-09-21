@@ -29,6 +29,13 @@
         "default_icon": "images/toolbar-icon.svg"
     },
 
-    "permissions": [ "activeTab", "tabs", "storage", "nativeMessaging" ],
-    "host_permissions": [ "http://*/*", "https://*/*" ]
+    "permissions": [ "activeTab", "tabs", "storage", "nativeMessaging", "declarativeNetRequestWithHostAccess", "declarativeNetRequestFeedback" ],
+    "host_permissions": [ "http://*/*", "https://*/*" ],
+    "declarative_net_request": {
+        "rule_resources": [{
+            "id": "chatgpt_frame_rules",
+            "enabled": true,
+            "path": "chatgpt-frame.json"
+        }]
+    }
 }

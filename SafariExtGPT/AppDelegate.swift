@@ -20,6 +20,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let codexRedirectURI = "http://localhost:1455/auth/callback"
     private let codexTokenURL = URL(string: "https://auth.openai.com/oauth/token")!
     private let codexResponsesURL = URL(string: "https://chatgpt.com/backend-api/codex/responses")!
+    private let chatGPTHistoryURL = URL(string: "https://ios.chat.openai.com/backend-api/conversations")!
 
     private func validatedOAuthAuthorizationURL() -> URL? {
         guard let defaults = UserDefaults(suiteName: appGroupID) else {
@@ -248,12 +249,108 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 return
             }
 
+            let diagnosticLines = text
+                .components(separatedBy: .newlines)
+                .filter { line in
+                    line.contains("response.created") ||
+                    line.contains("response.completed") ||
+                    line.contains("conversation") ||
+                    line.contains("thread")
+                }
+                .prefix(20)
+
+            if !diagnosticLines.isEmpty {
+                os_log(.default, "SafariExtGPT Codex server metadata:\n%{public}@", diagnosticLines.joined(separator: "\n"))
+            } else {
+                os_log(.default, "SafariExtGPT Codex server metadata: no conversation/thread fields found in stream")
+            }
+
             if text.contains("SAFARI_CODEX_OK") {
                 completion(.success("SAFARI_CODEX_OK"))
             } else {
                 completion(.failure(NSError(domain: "SafariExtGPT.Codex", code: 13, userInfo: [NSLocalizedDescriptionKey: "Codex stream completed without SAFARI_CODEX_OK: \(text.prefix(1000))"])))
             }
         }.resume()
+    }
+
+    private func runChatGPTHistoryTest(completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let defaults = UserDefaults(suiteName: appGroupID),
+              let accessToken = defaults.string(forKey: "oauth.accessToken"),
+              !accessToken.isEmpty else {
+            completion(.failure(NSError(domain: "SafariExtGPT.ChatHistory", code: 20, userInfo: [NSLocalizedDescriptionKey: "OAuth access token is missing"])))
+            return
+        }
+
+        let idToken = defaults.string(forKey: "oauth.idToken")
+        guard let accountID = chatGPTAccountID(from: accessToken) ?? idToken.flatMap({ chatGPTAccountID(from: $0) }) else {
+            completion(.failure(NSError(domain: "SafariExtGPT.ChatHistory", code: 21, userInfo: [NSLocalizedDescriptionKey: "ChatGPT account ID is missing from OAuth tokens"])))
+            return
+        }
+
+        var components = URLComponents(url: chatGPTHistoryURL, resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "offset", value: "0"),
+            URLQueryItem(name: "limit", value: "10"),
+            URLQueryItem(name: "order", value: "updated"),
+            URLQueryItem(name: "expand", value: "false"),
+            URLQueryItem(name: "is_archived", value: "false")
+        ]
+
+        guard let url = components.url else {
+            completion(.failure(NSError(domain: "SafariExtGPT.ChatHistory", code: 22, userInfo: [NSLocalizedDescriptionKey: "Could not build ChatGPT history URL"])))
+            return
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue(accountID, forHTTPHeaderField: "ChatGPT-Account-ID")
+        request.setValue("ChatGPT/1.2026.160", forHTTPHeaderField: "User-Agent")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error {
+                completion(.failure(error))
+                return
+            }
+
+            guard let http = response as? HTTPURLResponse,
+                  let data else {
+                completion(.failure(NSError(domain: "SafariExtGPT.ChatHistory", code: 23, userInfo: [NSLocalizedDescriptionKey: "Invalid ChatGPT history response"])))
+                return
+            }
+
+            guard (200...299).contains(http.statusCode) else {
+                let text = String(data: data, encoding: .utf8) ?? ""
+                os_log(.error, "SafariExtGPT ChatGPT history HTTP %{public}d, content-type=%{public}@", http.statusCode, http.value(forHTTPHeaderField: "Content-Type") ?? "<none>")
+                completion(.failure(NSError(domain: "SafariExtGPT.ChatHistory", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: "ChatGPT history HTTP \(http.statusCode): \(text.prefix(1000))"])))
+                return
+            }
+
+            do {
+                guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let items = json["items"] as? [[String: Any]] else {
+                    throw NSError(domain: "SafariExtGPT.ChatHistory", code: 24, userInfo: [NSLocalizedDescriptionKey: "ChatGPT history response has no items array"])
+                }
+
+                let total = json["total"] as? Int
+                os_log(.default, "SafariExtGPT ChatGPT history succeeded: HTTP %{public}d total=%{public}@ returned=%{public}d", http.statusCode, total.map(String.init) ?? "<unknown>", items.count)
+
+                for item in items {
+                    let conversationID = item["id"] as? String ?? "<missing-id>"
+                    let title = item["title"] as? String ?? "<untitled>"
+                    os_log(.default, "SafariExtGPT ChatGPT conversation: %{public}@ | %{public}@", conversationID, title)
+                }
+
+                completion(.success(()))
+            } catch {
+                completion(.failure(error))
+            }
+        }.resume()
+    }
+
+    private var isChatGPTHistoryTestLaunch: Bool {
+        ProcessInfo.processInfo.arguments.contains("--chatgpt-history-test")
     }
 
     private var isOAuthHelperLaunch: Bool {
@@ -340,6 +437,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        if isChatGPTHistoryTestLaunch {
+            NSApp.setActivationPolicy(.accessory)
+            NSApp.windows.forEach { $0.orderOut(nil) }
+            os_log(.default, "SafariExtGPT ChatGPT history test started")
+            runChatGPTHistoryTest { result in
+                DispatchQueue.main.async {
+                    switch result {
+                    case .success:
+                        os_log(.default, "SafariExtGPT ChatGPT history test finished successfully")
+                    case .failure(let error):
+                        os_log(.error, "SafariExtGPT ChatGPT history test failed: %{public}@", error.localizedDescription)
+                    }
+                    NSApp.terminate(nil)
+                }
+            }
+            return
+        }
         if isCodexSmokeTestLaunch {
             NSApp.setActivationPolicy(.accessory)
             NSApp.windows.forEach { $0.orderOut(nil) }

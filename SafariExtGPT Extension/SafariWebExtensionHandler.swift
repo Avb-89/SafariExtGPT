@@ -96,6 +96,61 @@ class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
         ]
     }
 
+    private func chatGPTAccountID(from token: String) -> String? {
+        let parts = token.split(separator: ".")
+        guard parts.count >= 2 else { return nil }
+
+        var payload = String(parts[1])
+            .replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+
+        let remainder = payload.count % 4
+        if remainder != 0 {
+            payload += String(repeating: "=", count: 4 - remainder)
+        }
+
+        guard let data = Data(base64Encoded: payload),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return nil
+        }
+
+        if let accountID = object["chatgpt_account_id"] as? String {
+            return accountID
+        }
+
+        if let auth = object["https://api.openai.com/auth"] as? [String: Any],
+           let accountID = auth["chatgpt_account_id"] as? String {
+            return accountID
+        }
+
+        return nil
+    }
+
+    private func chatGPTAuthHeaders() -> [String: Any] {
+        guard let defaults = UserDefaults(suiteName: appGroupID),
+              let accessToken = defaults.string(forKey: "oauth.accessToken"),
+              !accessToken.isEmpty else {
+            return [
+                "ok": false,
+                "error": "OAuth access token is missing"
+            ]
+        }
+
+        let idToken = defaults.string(forKey: "oauth.idToken")
+        guard let accountID = chatGPTAccountID(from: accessToken) ?? idToken.flatMap({ chatGPTAccountID(from: $0) }) else {
+            return [
+                "ok": false,
+                "error": "ChatGPT account ID is missing"
+            ]
+        }
+
+        return [
+            "ok": true,
+            "accessToken": accessToken,
+            "accountID": accountID
+        ]
+    }
+
     func beginRequest(with context: NSExtensionContext) {
         let request = context.inputItems.first as? NSExtensionItem
 
@@ -125,6 +180,8 @@ class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
                     "ok": true,
                     "reply": "SAFARI_NATIVE_OK"
                 ]
+            case "GET_CHATGPT_AUTH_HEADERS":
+                responseMessage = chatGPTAuthHeaders()
             case "PREPARE_CODEX_OAUTH":
                 responseMessage = prepareOAuthRequestForApp()
             default:
